@@ -29,8 +29,8 @@ class SproutLoadingOverlayState extends State<SproutLoadingOverlay>
   Timer? _timeoutTimer;
   bool _isTimedOut = false;
 
-  /// 超时时长 15 秒
-  static const _timeoutSeconds = 15;
+  /// 超时时长 12 秒（离线模式限制）
+  static const _timeoutSeconds = 12;
 
   @override
   void initState() {

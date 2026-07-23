@@ -1,13 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/gentle_copy.dart';
 import '../../core/constants/app_routes.dart';
+import '../../core/constants/enums.dart';
+import '../../shared/models/music_work.dart';
+import '../../shared/services/work_repository.dart';
+import 'humming_garden_provider.dart';
 
 /// 作品编辑器 — 播放预览、滑杆调节、双音轨、保存/分享
 class EditorPage extends StatefulWidget {
   final String workId;
-  const EditorPage({super.key, required this.workId});
+  final String recordingPath;
+  final String styleName;
+  final String moodName;
+
+  const EditorPage({
+    super.key,
+    required this.workId,
+    this.recordingPath = '',
+    this.styleName = '',
+    this.moodName = '',
+  });
 
   @override
   State<EditorPage> createState() => _EditorPageState();
@@ -28,10 +43,31 @@ class _EditorPageState extends State<EditorPage> {
   // 第二段哼唱
   bool _hasSecondTrack = false;
 
+  // 录音数据（从构造器参数）
+  String _recordingPath = '';
+  StyleSeed _styleSeed = StyleSeed.morningDew;
+  MoodColor? _moodColor;
+
   // 默认值
   static const _defaultTemperature = 0.5;
   static const _defaultSpeed = 1.0;
   static const _defaultInstrumentMix = 0.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordingPath = widget.recordingPath;
+    if (widget.styleName.isNotEmpty) {
+      try {
+        _styleSeed = StyleSeed.values.byName(widget.styleName);
+      } catch (_) {}
+    }
+    if (widget.moodName.isNotEmpty) {
+      try {
+        _moodColor = MoodColor.values.byName(widget.moodName);
+      } catch (_) {}
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,44 +152,47 @@ class _EditorPageState extends State<EditorPage> {
                 ),
               ),
 
-              // 底部操作按钮
+              // 底部操作按钮 — 2×2 网格
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _saveAndJumpToPostOffice,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primaryGreen,
-                        side: const BorderSide(color: AppTheme.primaryGreen),
-                        minimumSize: const Size(0, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      icon: const Icon(Icons.mail_outline, size: 18),
-                      label: const Text(
-                        GentleCopy.jumpToPostOffice,
-                        style: TextStyle(fontSize: 13),
-                      ),
+                    child: _ActionButton(
+                      icon: Icons.save_outlined,
+                      label: GentleCopy.save,
+                      isPrimary: true,
+                      onTap: _saveWork,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _saveWork,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        minimumSize: const Size(0, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      icon: const Icon(Icons.save_outlined, size: 18),
-                      label: const Text(
-                        '保存',
-                        style: TextStyle(fontSize: 13),
-                      ),
+                    child: _ActionButton(
+                      icon: Icons.mail_outline,
+                      label: GentleCopy.sendToParents,
+                      isPrimary: false,
+                      onTap: _saveAndJumpToPostOffice,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.park,
+                      label: GentleCopy.shareToTree,
+                      isPrimary: false,
+                      onTap: _shareToTree,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.add_circle_outline,
+                      label: GentleCopy.continueCreating,
+                      isPrimary: false,
+                      onTap: _continueCreating,
                     ),
                   ),
                 ],
@@ -329,8 +368,34 @@ class _EditorPageState extends State<EditorPage> {
 
   // ── 保存 & 跳转 ──
 
-  void _saveWork() {
-    // TODO: 真实持久化到 WorkRepository
+  /// 创建并持久化 MusicWork
+  MusicWork _createWork() {
+    final now = DateTime.now();
+    return MusicWork(
+      id: now.millisecondsSinceEpoch.toString(),
+      title: '${_styleSeed.label} · ${now.month}/${now.day}',
+      audioPath: _recordingPath,
+      styleSeed: _styleSeed,
+      moodSticker: _moodColor,
+      duration: const Duration(seconds: 30),
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  Future<void> _persistWork(MusicWork work) async {
+    // 1. 添加到 Provider（内存）
+    if (mounted) {
+      context.read<HummingGardenProvider>().addWork(work);
+    }
+    // 2. 持久化到文件
+    await WorkRepository().addWork(work);
+  }
+
+  Future<void> _saveWork() async {
+    final work = _createWork();
+    await _persistWork(work);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -351,8 +416,10 @@ class _EditorPageState extends State<EditorPage> {
     context.pop();
   }
 
-  void _saveAndJumpToPostOffice() {
-    // 保存后跳转声音邮局
+  Future<void> _saveAndJumpToPostOffice() async {
+    final work = _createWork();
+    await _persistWork(work);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -371,12 +438,85 @@ class _EditorPageState extends State<EditorPage> {
       ),
     );
 
-    // 延迟跳转，让用户看到保存成功提示
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
         context.push(AppRoutes.composeCard);
       }
     });
+  }
+
+  /// 种到音乐树
+  void _shareToTree() {
+    final work = _createWork();
+    _persistWork(work);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(GentleCopy.shareToTreeHint,
+            style: TextStyle(color: AppTheme.chineseInk, fontSize: 13),
+            textAlign: TextAlign.center),
+        backgroundColor: AppTheme.chineseBeigeAlt,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppTheme.greenStroke, width: 1)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    context.pop();
+  }
+
+  /// 继续创作
+  void _continueCreating() {
+    final work = _createWork();
+    _persistWork(work);
+    context.pop();
+  }
+}
+
+/// 操作按钮（编辑器底部 2×2 网格复用）
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isPrimary;
+  final VoidCallback? onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.isPrimary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isPrimary) {
+      return ElevatedButton.icon(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.primaryGreen,
+          minimumSize: const Size(0, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppTheme.primaryGreen,
+        side: const BorderSide(color: AppTheme.primaryGreen),
+        minimumSize: const Size(0, 48),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+    );
   }
 }
 

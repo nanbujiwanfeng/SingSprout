@@ -75,8 +75,13 @@ class AppRouter {
         path: AppRoutes.editor,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final workId = state.uri.queryParameters['id'] ?? '';
-          return EditorPage(workId: workId);
+          final params = state.uri.queryParameters;
+          return EditorPage(
+            workId: params['id'] ?? '',
+            recordingPath: Uri.decodeComponent(params['path'] ?? ''),
+            styleName: params['style'] ?? '',
+            moodName: params['mood'] ?? '',
+          );
         },
       ),
       GoRoute(

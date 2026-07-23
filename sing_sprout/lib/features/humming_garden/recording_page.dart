@@ -197,13 +197,23 @@ class _RecordingPageState extends State<RecordingPage> {
     );
   }
 
+  String _analysisText = GentleCopy.processing;
+
   void _startGeneration() {
     setState(() {
       _isGenerating = true;
       _isTimedOut = false;
+      _analysisText = GentleCopy.pitchAnalyzing;
     });
 
-    // 模拟 AI 生成流程：2 秒后完成
+    // 模拟分析阶段：依次展示分析步骤
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _analysisText = GentleCopy.rhythmExtracting);
+    });
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _analysisText = GentleCopy.melodyMatching);
+    });
+    // 2 秒后进入芽苗生长阶段
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted && _isGenerating) {
         _sproutKey.currentState?.complete();
@@ -214,7 +224,12 @@ class _RecordingPageState extends State<RecordingPage> {
   void _navigateToEditor() {
     if (!mounted) return;
     setState(() => _isGenerating = false);
-    context.go('${AppRoutes.editor}?id=new');
+    final path = Uri.encodeComponent(widget.recordingPath ?? '');
+    final style = _selectedStyle.name;
+    final mood = _selectedMood?.name ?? '';
+    context.go(
+      '${AppRoutes.editor}?id=new&path=$path&style=$style&mood=$mood',
+    );
   }
 
   void _showGentleSnackBar(String message) {

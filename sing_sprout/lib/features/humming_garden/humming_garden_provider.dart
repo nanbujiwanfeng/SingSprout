@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../shared/models/music_work.dart';
+import '../../shared/services/work_repository.dart';
 
 /// 哼唱花园状态管理
 class HummingGardenProvider extends ChangeNotifier {
@@ -21,12 +22,15 @@ class HummingGardenProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 加载本地作品（从 SQLite）
+  /// 加载本地作品
   Future<void> loadWorks() async {
     _isLoading = true;
     notifyListeners();
 
-    // TODO: 从本地数据库加载
+    final repo = WorkRepository();
+    final loaded = await repo.getWorks();
+    _works.clear();
+    _works.addAll(loaded);
 
     _isLoading = false;
     notifyListeners();

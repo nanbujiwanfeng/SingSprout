@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// 音频服务 — 录音与播放
 /// 集成 record 包实现真实录音，振幅流归一化输出
@@ -25,25 +26,36 @@ class AudioService {
   /// 归一化音量流 (0.0 ~ 1.0)
   Stream<double> get amplitudeStream => _amplitudeController.stream;
 
-  /// 请求麦克风权限
+  /// 请求麦克风权限（record 原生 + permission_handler 双保险）
   Future<bool> requestMicPermission() async {
-    if (Platform.isIOS || Platform.isAndroid) {
-      return await _recorder.hasPermission();
-    }
-    // 桌面/Web 默认允许（或走 permission_handler）
-    return true;
+    if (!Platform.isIOS && !Platform.isAndroid) return true;
+
+    // 1. 先用 record 原生检查（最可靠）
+    if (await _recorder.hasPermission()) return true;
+
+    // 2. 未授权：用 permission_handler 弹系统弹窗
+    final status = await Permission.microphone.request();
+    if (status.isGranted) return true;
+
+    // 3. 再次用 record 确认
+    return await _recorder.hasPermission();
   }
 
+  // 注：requestStoragePermission 已移除。
+  // Android 13+ 应用私有目录无需存储权限，录音文件直接保存在
+  // getApplicationDocumentsDirectory()/singsprout/ 下。
+
   /// 开始录音，返回文件路径
+  /// 注意：调用前需通过 requestMicPermission() 确保已获授权
   Future<String?> startRecording() async {
     try {
-      final hasPermission = await _recorder.hasPermission();
-      if (!hasPermission) return null;
-
       final dir = await getApplicationDocumentsDirectory();
       final fileName =
           'recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
       final path = '${dir.path}/singsprout/$fileName';
+
+      // 确保目录存在
+      await Directory('${dir.path}/singsprout').create(recursive: true);
 
       await _recorder.start(
         const RecordConfig(

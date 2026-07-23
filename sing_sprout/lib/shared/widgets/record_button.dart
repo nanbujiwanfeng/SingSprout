@@ -24,7 +24,7 @@ class RecordButton extends StatefulWidget {
 }
 
 class _RecordButtonState extends State<RecordButton>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _isPressed = false;
 
   /// 按压缩放控制器

@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'shared/providers/app_state.dart';
 import 'shared/providers/audio_provider.dart';
 import 'shared/providers/connectivity_provider.dart';
+import 'features/humming_garden/humming_garden_provider.dart';
 import 'core/routes/app_router.dart';
 import 'shared/services/update_service.dart';
 import 'shared/widgets/update_dialog.dart';
@@ -31,6 +32,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => AudioProvider()),
+        ChangeNotifierProvider(create: (_) => HummingGardenProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],
       child: const SingSproutApp(),
