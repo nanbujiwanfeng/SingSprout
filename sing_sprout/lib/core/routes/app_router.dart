@@ -66,7 +66,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.recording,
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const RecordingPage(),
+        builder: (context, state) {
+          final recordingPath = state.uri.queryParameters['path'];
+          return RecordingPage(recordingPath: recordingPath);
+        },
       ),
       GoRoute(
         path: AppRoutes.editor,

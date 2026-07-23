@@ -1,13 +1,19 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/gentle_copy.dart';
 import '../../core/constants/enums.dart';
 import '../../core/constants/app_routes.dart';
 import '../../shared/widgets/mood_color_picker.dart';
+import '../../shared/widgets/sprout_loading_overlay.dart';
+import '../../shared/widgets/style_preview_card.dart';
 
 /// 录音与 AI 生成页面
 class RecordingPage extends StatefulWidget {
-  const RecordingPage({super.key});
+  final String? recordingPath;
+
+  const RecordingPage({super.key, this.recordingPath});
 
   @override
   State<RecordingPage> createState() => _RecordingPageState();
@@ -17,53 +23,80 @@ class _RecordingPageState extends State<RecordingPage> {
   StyleSeed _selectedStyle = StyleSeed.morningDew;
   MoodColor? _selectedMood;
 
+  bool _isGenerating = false;
+  bool _isTimedOut = false;
+  final GlobalKey<SproutLoadingOverlayState> _sproutKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
+    final hasRecording = widget.recordingPath != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('创作'),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 波形可视化占位
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.primaryGreen.withOpacity(0.15),
-                  ),
-                ),
-                child: const Center(
-                  child: Text(
-                    '🎵 正在用 AI 听懂你的旋律...',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                  ),
-                ),
-              ),
+              // 芽苗加载动画 / 录音状态
+              if (_isGenerating)
+                SproutLoadingOverlay(
+                  key: _sproutKey,
+                  onTimeout: () {
+                    setState(() => _isTimedOut = true);
+                    _showGentleSnackBar(GentleCopy.modelFallback);
+                  },
+                  onComplete: () {
+                    _navigateToEditor();
+                  },
+                )
+              else
+                _buildRecordingStatus(hasRecording),
 
               const SizedBox(height: 32),
 
-              // 风格种子选择
-              const Text(
-                '选择风格',
-                style: TextStyle(
+              // 风格选择
+              Text(
+                GentleCopy.selectStyle,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                 ),
               ),
+              const SizedBox(height: 4),
+              const Text(
+                GentleCopy.previewHint,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
               const SizedBox(height: 12),
-              _StyleSeedGrid(
-                selected: _selectedStyle,
-                onSelected: (style) => setState(() => _selectedStyle = style),
+
+              // 横向风格卡片
+              SizedBox(
+                height: 155,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: StyleSeed.values.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final style = StyleSeed.values[index];
+                    return StylePreviewCard(
+                      style: style,
+                      isSelected: style == _selectedStyle,
+                      width: 105,
+                      onSelected: () {
+                        setState(() => _selectedStyle = style);
+                      },
+                    );
+                  },
+                ),
               ),
 
               const SizedBox(height: 24),
@@ -83,19 +116,23 @@ class _RecordingPageState extends State<RecordingPage> {
                 onSelected: (mood) => setState(() => _selectedMood = mood),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 32),
 
               // 生成按钮
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: 调用 AI 生成 → 跳转编辑器
-                    context.go(
-                      '${AppRoutes.editor}?id=new',
-                    );
-                  },
-                  child: const Text('✨ AI 生成音乐'),
+                  onPressed: _isGenerating ? null : _startGeneration,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    disabledBackgroundColor:
+                        AppTheme.primaryGreen.withOpacity(0.4),
+                  ),
+                  child: Text(
+                    _isTimedOut
+                        ? '🔄 ${GentleCopy.modelFallback}'
+                        : '✨ AI 生成音乐',
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -105,61 +142,102 @@ class _RecordingPageState extends State<RecordingPage> {
       ),
     );
   }
-}
 
-class _StyleSeedGrid extends StatelessWidget {
-  final StyleSeed selected;
-  final ValueChanged<StyleSeed> onSelected;
-
-  const _StyleSeedGrid({required this.selected, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: StyleSeed.values.map((style) {
-        final isSelected = style == selected;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: GestureDetector(
-              onTap: () => onSelected(style),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.primaryGreen.withOpacity(0.1)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppTheme.primaryGreen
-                        : AppTheme.divider,
-                    width: isSelected ? 2 : 1,
+  Widget _buildRecordingStatus(bool hasRecording) {
+    return Container(
+      height: 120,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreen.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.greenStroke.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Center(
+        child: hasRecording
+            ? const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: AppTheme.primaryGreen,
+                    size: 40,
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Text(style.icon, style: const TextStyle(fontSize: 24)),
-                    const SizedBox(height: 4),
-                    Text(
-                      style.label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected
-                            ? AppTheme.primaryGreen
-                            : AppTheme.textSecondary,
-                      ),
+                  SizedBox(height: 8),
+                  Text(
+                    GentleCopy.recordingDone,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              )
+            : const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.mic,
+                    color: AppTheme.primaryGreen,
+                    size: 36,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    GentleCopy.processing,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-            ),
+      ),
+    );
+  }
+
+  void _startGeneration() {
+    setState(() {
+      _isGenerating = true;
+      _isTimedOut = false;
+    });
+
+    // 模拟 AI 生成流程：2 秒后完成
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && _isGenerating) {
+        _sproutKey.currentState?.complete();
+      }
+    });
+  }
+
+  void _navigateToEditor() {
+    if (!mounted) return;
+    setState(() => _isGenerating = false);
+    context.go('${AppRoutes.editor}?id=new');
+  }
+
+  void _showGentleSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: AppTheme.chineseInk,
+            fontSize: 13,
           ),
-        );
-      }).toList(),
+          textAlign: TextAlign.center,
+        ),
+        backgroundColor: AppTheme.chineseBeigeAlt,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppTheme.greenStroke, width: 1),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 }

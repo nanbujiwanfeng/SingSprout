@@ -9,6 +9,16 @@ class AppTheme {
   static const Color primaryWarm = Color(0xFFF5D04A);
   static const Color primarySoil = Color(0xFF8B6914);
 
+  // ── 国风配色 ──
+  static const Color chineseBeige = Color(0xFFF5F0E5);       // 宣纸米色背景
+  static const Color chineseBeigeAlt = Color(0xFFEDE5D5);    // 略深米色
+  static const Color chineseGreenLight = Color(0xFFA8C8A0);  // 淡竹绿（渐变高光）
+  static const Color chineseGreenMid = Color(0xFF7BAA6E);    // 中绿
+  static const Color chineseGreenDark = Color(0xFF4A7A3E);   // 深绿（渐变暗部）
+  static const Color greenStroke = Color(0xFF8DBF8A);        // 气泡描边淡绿
+  static const Color chineseInk = Color(0xFF3C3C3C);         // 墨色文字
+  static const Color chineseGold = Color(0xFFC5A55A);        // 淡金点缀
+
   // ── 心情色盘（孩子主动选择） ──
   static const Color moodRed = Color(0xFFFF6B6B);     // 开心
   static const Color moodYellow = Color(0xFFFFD93D);   // 兴奋
@@ -28,6 +38,22 @@ class AppTheme {
   static const Color success = Color(0xFF52C41A);
   static const Color warning = Color(0xFFFAAD14);
   static const Color error = Color(0xFFFF4D4F);
+
+  // ── 书法标题样式 ──
+  static const TextStyle calligraphyTitle = TextStyle(
+    fontSize: 32,
+    fontWeight: FontWeight.w700,
+    color: chineseInk,
+    height: 1.2,
+    letterSpacing: 4.0,
+    shadows: [
+      Shadow(
+        color: Color(0x33000000),
+        offset: Offset(2, 2),
+        blurRadius: 6,
+      ),
+    ],
+  );
 
   static ThemeData get lightTheme {
     return ThemeData(
