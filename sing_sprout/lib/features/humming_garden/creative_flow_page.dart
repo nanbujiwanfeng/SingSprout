@@ -287,9 +287,8 @@ class _CreativeFlowPageState extends State<CreativeFlowPage>
           transitionController: _transitionController,
           isLongPressing: _isLongPressing,
           onGoToRecording: () async {
-            _onLongPressStart();
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (!_isLongPressing || !mounted) return;
+            setState(() => _isLongPressing = true);
+            _pressScaleController.forward();
             await _vm.startRecording();
             if (_vm.recordedFilePath == null) {
               // 录音启动失败，回退动画并提示用户

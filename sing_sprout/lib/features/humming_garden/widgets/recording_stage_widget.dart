@@ -73,7 +73,7 @@ class IdleStageWidget extends StatelessWidget {
                     ],
                   ),
                   child: const Text(
-                    '轻轻按住麦克风哼一段小调，你的声音会长出专属音乐小树，还能做成明信片送给家人',
+                    '轻点麦克风哼一段小调，你的声音会长出专属音乐小树，还能做成明信片送给家人',
                     style: TextStyle(
                         fontSize: 13,
                         color: Color(0xFF444444),
@@ -116,7 +116,7 @@ class IdleStageWidget extends StatelessWidget {
             Transform.scale(
               scale: 1.0 + t * 0.3,
               child: GestureDetector(
-                onLongPressStart: (_) => onGoToRecording(),
+                onTap: () => onGoToRecording(),
                 onLongPressMoveUpdate: (details) {
                   final isInside = details.localPosition.dy > -60;
                   onFingerInsideChanged(isInside);
