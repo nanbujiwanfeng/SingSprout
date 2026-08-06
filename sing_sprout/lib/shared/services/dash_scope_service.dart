@@ -578,7 +578,7 @@ class DashScopeService {
               'max_tokens': needsMelody ? 4000 : 3000,
             }),
           )
-          .timeout(const Duration(seconds: 35));
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode != 200) {
         debugPrint('[DashScope] Full-score API error ${response.statusCode}: ${response.body}');

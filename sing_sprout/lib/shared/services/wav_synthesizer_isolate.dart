@@ -146,8 +146,18 @@ class WavSynthesizerIsolate {
             Exception('Isolate合成失败: ${msg[0]}'),
             StackTrace.fromString(msg[1].toString()),
           );
-        } else if (msg == null && !completer.isCompleted) {
+        } else if (msg is SendPort) {
+          // Isolate exited via onExit — treat as unexpected termination
+          if (!completer.isCompleted) {
+            completer.completeError(StateError('Isolate意外终止 (onExit)'));
+          }
+        } else if (msg == null) {
           completer.completeError(StateError('Isolate意外终止'));
+        } else {
+          // Unknown message type — don't hang, signal error
+          completer.completeError(
+            StateError('Isolate返回了未知的消息类型: ${msg.runtimeType}'),
+          );
         }
       });
 

@@ -349,12 +349,22 @@ class _RhythmGamePageState extends State<RhythmGamePage>
     setState(() { _startPhase = _StartPhase.generating; });
 
     // Fast path: procedural runs first so the player never waits long.
-    final procedural = await AiMusicService().proceduralMusic(_selectedStyle);
+    AiMusicResult? procedural;
+    try {
+      procedural = await AiMusicService().proceduralMusic(_selectedStyle);
+    } catch (e) {
+      debugPrint('[RhythmGame] proceduralMusic failed: $e');
+    }
     if (!mounted) return;
 
-    _aiResult = procedural;
-    setState(() { _startPhase = _StartPhase.idle; });
-    _startAiGame();
+    if (procedural != null) {
+      _aiResult = procedural;
+      setState(() { _startPhase = _StartPhase.idle; });
+      _startAiGame();
+    } else {
+      setState(() { _startPhase = _StartPhase.idle; });
+      // Let the game page show an error/retry state
+    }
 
     // Background: try AI generation for a better replay experience.
     AiMusicService().generateGameMusic(_selectedStyle).then((ai) {

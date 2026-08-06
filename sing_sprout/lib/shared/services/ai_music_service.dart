@@ -64,8 +64,10 @@ class AiMusicService {
       final tempo = parsed['tempo'] as double;
       final mood = parsed['mood'] as String;
 
-      if (melodyNotes.length < 20 || percussionNotes.length < 10) {
-        debugPrint('[AiMusicService] Attempt $attempt: too few notes (m=${melodyNotes.length} p=${percussionNotes.length})');
+      final minMelody = style == AiMusicStyle.calm ? 10 : 18;
+      final minPerc = style == AiMusicStyle.calm ? 5 : 8;
+      if (melodyNotes.length < minMelody || percussionNotes.length < minPerc) {
+        debugPrint('[AiMusicService] Attempt $attempt: too few notes (m=${melodyNotes.length} p=${percussionNotes.length}, min=$minMelody/$minPerc)');
         continue;
       }
 
@@ -308,14 +310,20 @@ $styleGuide
 
       final melodyNotes = melodyRaw
           .map((item) {
-            final m = item as Map<String, dynamic>;
+            if (item is! Map<String, dynamic>) return null;
+            final m = item;
+            final pitch = m['pitch'];
+            final startTime = m['startTime'];
+            final duration = m['duration'];
+            if (pitch is! num || startTime is! num || duration is! num) return null;
             return AiGameNote(
-              pitch: (m['pitch'] as num).toInt(),
-              startTime: (m['startTime'] as num).toDouble(),
-              duration: (m['duration'] as num).toDouble(),
+              pitch: pitch.toInt(),
+              startTime: startTime.toDouble(),
+              duration: duration.toDouble(),
               isPercussion: false,
             );
           })
+          .whereType<AiGameNote>()
           .where((n) =>
               n.pitch >= 55 &&
               n.pitch <= 84 &&

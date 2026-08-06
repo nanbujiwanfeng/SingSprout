@@ -67,7 +67,8 @@ class ArrangementEngine {
     required int tonicMidi,
     double? durationOverride,
   }) {
-    final beatDuration = 60.0 / score.tempoBpm;
+    final safeTempo = score.tempoBpm.clamp(30, 200);
+    final beatDuration = 60.0 / safeTempo;
     final barDuration = beatDuration * 4.0;
 
     // Use AI-composed melody if available
