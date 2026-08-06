@@ -51,4 +51,7 @@ class AppConfig {
 
   // 设备分级：≥2GB RAM 启用端侧 AI 模型 (CREPE TFLite)
   static const int highEndDeviceRamMB = 2048;
+
+  /// 当前 APK 的 SHA-256（编译时嵌入，作为 Release 缺失 hash 时的回退校验值）
+  static const String apkSha256 = 'd0138beb92cb123319958e70bdf9e6d4faca84382070f5323701b3dacbc9e2a1';
 }

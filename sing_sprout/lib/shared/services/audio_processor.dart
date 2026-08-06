@@ -111,6 +111,43 @@ class AudioProcessor {
     await File(filePath).writeAsBytes(out.buffer.asUint8List());
   }
 
+  /// Write interleaved stereo samples as a 16-bit stereo WAV file.
+  static Future<void> writeStereoWav(String filePath, Float64List samples, int sampleRate) async {
+    final numFrames = samples.length ~/ 2;
+    final dataSize = numFrames * 4; // 2 channels × 2 bytes
+    final fileSize = 44 + dataSize;
+    final out = ByteData(fileSize);
+
+    void w(int o, String s) {
+      for (var i = 0; i < s.length; i++) {
+        out.setUint8(o + i, s.codeUnitAt(i));
+      }
+    }
+
+    w(0, 'RIFF');
+    out.setUint32(4, fileSize - 8, Endian.little);
+    w(8, 'WAVE');
+    w(12, 'fmt ');
+    out.setUint32(16, 16, Endian.little);
+    out.setUint16(20, 1, Endian.little); // PCM
+    out.setUint16(22, 2, Endian.little); // stereo
+    out.setUint32(24, sampleRate, Endian.little);
+    out.setUint32(28, sampleRate * 4, Endian.little); // byte rate
+    out.setUint16(32, 4, Endian.little); // block align
+    out.setUint16(34, 16, Endian.little);
+    w(36, 'data');
+    out.setUint32(40, dataSize, Endian.little);
+
+    for (var i = 0; i < numFrames; i++) {
+      final l = (samples[i * 2].clamp(-1.0, 1.0) * 32767).round();
+      final r = (samples[i * 2 + 1].clamp(-1.0, 1.0) * 32767).round();
+      out.setInt16(44 + i * 4, l, Endian.little);
+      out.setInt16(44 + i * 4 + 2, r, Endian.little);
+    }
+
+    await File(filePath).writeAsBytes(out.buffer.asUint8List());
+  }
+
   // ── YIN Pitch Detection ──
 
   /// Run YIN algorithm on samples, return pitch contour.
