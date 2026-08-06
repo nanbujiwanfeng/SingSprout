@@ -34,14 +34,17 @@ class AiMusicService {
       return proceduralMusic(style);
     }
 
-    // Try AI generation (single attempt for speed)
+    // Try AI generation with retry + backoff
     for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      if (attempt > 0) {
+        await Future.delayed(Duration(seconds: attempt * 2)); // 0s, 2s, 4s backoff
+      }
 
       final rawJson = await dashScope.chatCompletion(
         systemPrompt: _systemPrompt(style),
         userMessage:
             '请为节奏游戏创作一段$_durationSeconds秒的${style.label}风格音乐。直接返回JSON，不要解释。',
-        temperature: 0.9,
+        temperature: 0.7,
         maxTokens: 4096,
       );
 
@@ -89,7 +92,7 @@ class AiMusicService {
     return proceduralMusic(style);
   }
 
-  static const _maxRetries = 1;
+  static const _maxRetries = 3;
 
   /// Procedural music generation — always fast, no network.
   ///

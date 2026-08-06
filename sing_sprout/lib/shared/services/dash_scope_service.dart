@@ -145,10 +145,13 @@ class DashScopeService {
           'temperature': temperature,
           'max_tokens': maxTokens,
         }),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode != 200) {
         debugPrint('[DashScope] chatCompletion error ${response.statusCode}');
+        if (response.statusCode == 429 || response.statusCode >= 500) {
+          return null; // caller will retry
+        }
         return null;
       }
 
