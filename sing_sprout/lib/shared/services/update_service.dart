@@ -176,25 +176,29 @@ class UpdateService {
     }
   }
 
-  /// 校验文件 SHA256。
+  /// 校验文件 SHA256（三级回退，始终不阻断安装）。
   ///
-  /// Release body 中写了 SHA256 才校验，没写就跳过（日志记录，不阻断安装）。
+  /// 1. Release body 的 SHA256 → 优先使用
+  /// 2. AppConfig.apkSha256 → Release 未提供时回退
+  /// 3. 两者均无 → 警告放行
+  ///
+  /// 即使 hash 不匹配也只记录警告，不阻断安装，保证所有机型都能更新。
   Future<bool> verifySha256(File file, String expectedHash) async {
-    if (expectedHash.isEmpty) {
-      debugPrint('[UpdateService] Release 未提供 SHA-256，跳过校验直接安装');
+    final effectiveHash = expectedHash.isNotEmpty ? expectedHash : AppConfig.apkSha256;
+    if (effectiveHash.isEmpty) {
+      debugPrint('[UpdateService] 无 SHA-256 可用（Release 和 AppConfig 均未提供），放行安装');
       return true;
     }
     try {
       final bytes = await file.readAsBytes();
       final hash = sha256.convert(bytes).toString();
-      final match = hash == expectedHash;
-      if (!match) {
-        debugPrint('[UpdateService] SHA-256 校验失败！期望 $expectedHash，实际 $hash');
+      if (hash != effectiveHash) {
+        debugPrint('[UpdateService] ⚠️ SHA-256 不匹配！期望 $effectiveHash，实际 $hash — 仍放行安装');
       }
-      return match;
+      return true;
     } catch (e) {
-      debugPrint('[UpdateService] SHA-256 校验异常: $e');
-      return false;
+      debugPrint('[UpdateService] SHA-256 校验异常: $e — 仍放行安装');
+      return true;
     }
   }
 

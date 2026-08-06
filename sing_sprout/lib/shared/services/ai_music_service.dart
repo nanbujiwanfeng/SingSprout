@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/ai_music_models.dart';
 import 'dash_scope_service.dart';
 import 'audio_processor.dart';
+import 'wavetable_engine.dart';
 
 /// Generates AI music for the rhythm game.
 ///
@@ -17,7 +18,7 @@ class AiMusicService {
   factory AiMusicService() => _instance;
   AiMusicService._();
 
-  static const _sampleRate = 22050;
+  static const _sampleRate = 44100;
   static const _durationSeconds = 30;
 
   /// Generate a complete music track for the rhythm game.
@@ -212,24 +213,32 @@ class AiMusicService {
     final styleGuide = switch (style) {
       AiMusicStyle.happy => '''
 风格：欢快活泼，明亮大调，跳跃旋律，适合儿童拍手跟唱。
-BPM: 100-130，节奏密集。
-旋律：多用五声音阶上行跳进，装饰音点缀。
-打击乐：kick每拍，snare在第2、4拍，hihat八分音符填充。''',
+BPM: 105-125，节奏轻快。
+旋律：五声音阶上行跳进为主(do-mi-sol跳跃)，下行级进回归。每2小节一个短乐句。
+  句尾用长音(0.5-1.0秒)形成"呼吸点"。
+打击乐：kick在1,3拍，snare在2,4拍，hihat填充八分音符空隙。
+  第4小节末尾加1拍fill(kick→snare→kick+hh→snare+hh)。''',
       AiMusicStyle.calm => '''
-风格：温柔宁静，舒缓摇篮曲风，长线条旋律。
-BPM: 60-85，节奏稀疏。
-旋律：级进为主，长音收尾，避免大跳。
-打击乐：仅kick在强拍轻点，用snare滚奏(每半拍连续轻击)过渡。''',
+风格：温柔宁静，舒缓摇篮曲风，长线条旋律如流水。
+BPM: 65-80，节奏从容。
+旋律：级进为主(相邻音高移动)，偶尔三度小跳。长音收尾(0.8-1.5秒)。
+  旋律要有"波浪感"——渐强上行然后渐弱下行。
+打击乐：极简。仅kick在第1拍轻点，第3拍可加或不加。
+  不使用hihat，让空间感突出旋律的纯净。最后2小节打击乐完全休止。''',
       AiMusicStyle.energetic => '''
-风格：强烈动感，电子舞曲元素，附点节奏驱动。
-BPM: 120-150，节奏密集有力。
-旋律：切分节奏，短促跳跃，重复动机。
-打击乐：kick四拍重击，snare反拍加强，hihat持续十六分音符。''',
+风格：强烈动感，身体会不由自主跟着动。附点节奏驱动，适合跳舞。
+BPM: 125-145，节奏密集有力。
+旋律：切分音为主——音符故意落在拍子之间制造"意外感"。
+  短促动机重复(2-3个音的短模式在不同音高上模进)。句尾戛然而止不拖长。
+打击乐：四拍全部重击kick，snare在第2,4拍强力反拍。
+  hihat持续八分音符(每半拍一个)，高潮段落升为十六分音符。''',
       AiMusicStyle.electronic => '''
-风格：现代电子合成，琶音上行，方波/锯齿波感。
-BPM: 100-140，节奏规整。
-旋律：琶音式上下行，模进重复，音色明亮。
-打击乐：电子鼓机感，kick低沉，snare/clap交替，hihat开闭变化。''',
+风格：现代电子合成，科技感十足。琶音上行如电流，方波音色明亮。
+BPM: 100-135，节奏规整。
+旋律：琶音式上下行(do-mi-sol-mi-do-sol)，模进重复(同一模式在不同音高重复)。
+  音域偏中高(MIDI 65-84)，音色清脆。每4小节变换一次模进起点音高。
+打击乐：电子鼓机感——kick低沉有力(bass drum)，snare/clap交替在2,4拍，
+  hihat开闭变化(每2小节交替密集/稀疏模式制造段落感)。''',
     };
 
     return '''
@@ -256,9 +265,12 @@ $styleGuide
 - 旋律音高仅在MIDI 55-84范围（G3-C6），儿童友好音域
 - 使用五声音阶（C, D, E, G, A 或其移位），避免半音和不和谐音程
 - 旋律密度：每秒1-4个音符（根据风格调整）
+- ★节奏多样性★：不要所有音符都是等长的。混合使用短音(0.15-0.3s)、中音(0.4-0.7s)、长音(0.8-1.5s)
+- ★乐句结构★：4小节×4拍为一个乐句单元。每句有明确的"起-承-转-合"走向
 - 打击乐：按BPM节奏严格排列，每拍都有kick或snare之一
 - 旋律音符的duration至少0.15秒，最多1.5秒
 - 确保输出20个以上旋律音符和15个以上打击乐音符
+- ★高潮设计★：在60%-80%位置安排旋律最高音和打击乐最密集段
 ''';
   }
 
@@ -349,7 +361,7 @@ $styleGuide
     };
   }
 
-  /// Synthesize AI-generated notes to WAV file.
+  /// Synthesize AI-generated notes to WAV using enhanced wavetable engine.
   Future<String?> _synthesizeWav(
     List<AiGameNote> melodyNotes,
     List<AiGameNote> percussionNotes,
@@ -358,22 +370,64 @@ $styleGuide
     try {
       final numSamples = (_sampleRate * _durationSeconds).ceil();
       final buffer = Float64List(numSamples);
+      final engine = WavetableEngine(sampleRate: _sampleRate, oversample2x: false);
 
-      // Render melody notes as sine waves
+      // Render melody notes with piano-like timbre
+      const profile = InstrumentProfile.piano;
+      const adsr = AdsrParams.melody;
       for (final note in melodyNotes) {
-        _renderSineNote(buffer, note);
+        if (note.pitch < 0 || note.pitch > 127) continue;
+        engine.renderNote(
+          buffer,
+          note.startTime,
+          note.duration,
+          note.pitch,
+          0.8,
+          profile,
+          adsr,
+          0.45,
+        );
       }
 
-      // Render percussion
-      final rng = Random(42);
+      // Render percussion with layered synthesis
+      var kickCount = 0, snareCount = 0, hhCount = 0, clapCount = 0;
       for (final note in percussionNotes) {
-        _renderPercussionHit(buffer, note, rng);
+        final startSample = (note.startTime * _sampleRate).round().clamp(0, buffer.length - 1);
+        // Percussion hit duration ~0.3 seconds
+        final endSample = (startSample + (_sampleRate * 0.3).round()).clamp(0, buffer.length);
+
+        final type = note.percussionType ?? 'kick';
+        PercussionType percType;
+        int seed;
+        switch (type) {
+          case 'kick':
+            percType = PercussionType.kick;
+            seed = kickCount++ * 127 + 42;
+            break;
+          case 'snare':
+            percType = PercussionType.snare;
+            seed = snareCount++ * 127 + 99;
+            break;
+          case 'hh':
+            percType = PercussionType.hihat;
+            seed = hhCount++ * 127 + 13;
+            break;
+          case 'clap':
+            percType = PercussionType.clap;
+            seed = clapCount++ * 127 + 77;
+            break;
+          default:
+            percType = PercussionType.kick;
+            seed = 42;
+        }
+
+        engine.renderPercussion(buffer, startSample, endSample, percType, 0.8, seed: seed);
       }
 
       // Soft clipper
       for (var i = 0; i < buffer.length; i++) {
         final x = buffer[i];
-        buffer[i] = x * (27 + x * x) / (27 + 9 * x * x) * 0.8;
+        buffer[i] = x * (27 + x * x) / (27 + 9 * x * x) * 0.85;
       }
 
       // Write WAV
@@ -393,77 +447,6 @@ $styleGuide
       return null;
     }
   }
-
-  void _renderSineNote(Float64List buffer, AiGameNote note) {
-    final freq = _midiToFreq(note.pitch);
-    final startSample =
-        (note.startTime * _sampleRate).round().clamp(0, buffer.length - 1);
-    final durSamples = (note.duration * _sampleRate).round();
-    final endSample = (startSample + durSamples).clamp(0, buffer.length);
-
-    for (var i = startSample; i < endSample; i++) {
-      final t = (i - startSample) / _sampleRate;
-      // ADSR envelope
-      const attack = 0.02;
-      const release = 0.08;
-      double env;
-      if (t < attack) {
-        env = t / attack;
-      } else if (t < note.duration - release) {
-        env = 0.75;
-      } else {
-        env = 0.75 * (1.0 - (t - (note.duration - release)) / release);
-      }
-      if (env <= 0) continue;
-      buffer[i] += sin(2 * pi * freq * t) * env * 0.4;
-    }
-  }
-
-  void _renderPercussionHit(
-    Float64List buffer,
-    AiGameNote note,
-    Random rng,
-  ) {
-    final startSample =
-        (note.startTime * _sampleRate).round().clamp(0, buffer.length - 1);
-    final type = note.percussionType ?? 'kick';
-
-    switch (type) {
-      case 'kick':
-        for (var i = startSample;
-            i < buffer.length && (i - startSample) / _sampleRate < 0.2;
-            i++) {
-          final t = (i - startSample) / _sampleRate;
-          final freq = (150 - t * 800).clamp(40, 200);
-          buffer[i] += sin(2 * pi * freq * t) * exp(-t * 25) * 0.6;
-        }
-        break;
-      case 'snare':
-        for (var i = startSample;
-            i < buffer.length && (i - startSample) / _sampleRate < 0.15;
-            i++) {
-          final t = (i - startSample) / _sampleRate;
-          buffer[i] +=
-              ((rng.nextDouble() * 2 - 1) * 0.5 + sin(2 * pi * 200 * t) * 0.5) *
-                  exp(-t * 35) *
-                  0.5;
-        }
-        break;
-      case 'hh':
-        var prev = 0.0;
-        for (var i = startSample;
-            i < buffer.length && (i - startSample) / _sampleRate < 0.08;
-            i++) {
-          final t = (i - startSample) / _sampleRate;
-          final raw = rng.nextDouble() * 2 - 1;
-          buffer[i] += ((raw - prev) * 0.5) * exp(-t * 60) * 0.3;
-          prev = raw;
-        }
-        break;
-    }
-  }
-
-  double _midiToFreq(int midi) => 440.0 * pow(2.0, (midi - 69) / 12.0);
 
   /// Map AI notes to game tracks based on pitch range.
   /// Used by RhythmGamePage to convert AiGameNotes into game _Notes.

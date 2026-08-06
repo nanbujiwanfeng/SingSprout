@@ -343,6 +343,19 @@ class ArrangementEngine {
       }
     }
 
+    // ── 7b. Interlude/Bridge (middle section for longer pieces) ──
+    final hasInterlude = melodyDuration >= 12.0;
+    if (hasInterlude) {
+      final interludeStart = introDuration + melodyDuration * 0.45; // ~45% into the piece
+      final interludeDuration = barDuration * 1.5; // 1.5 bars
+      final interludeNotes = _generateInterlude(tonicMidi, profile, interludeDuration, interludeStart, selectedProgression);
+      chordNotes.addAll(interludeNotes.where((n) => n.noteNumber >= 48));
+      bassNotes.addAll(interludeNotes.where((n) => n.noteNumber < 48));
+      if (profile.hasPercussion) {
+        percNotes.addAll(_generateInterludePercussion(interludeDuration, interludeStart, profile.tempo));
+      }
+    }
+
     // ── 8. Outro section ──
     if (hasOutro) {
       final outroStart = totalDuration - outroDuration;
@@ -711,6 +724,10 @@ class ArrangementEngine {
     [4, 5, 1, 1],
     [1, 5, 4, 5],
     [1, 6, 2, 5],
+    [1, 3, 4, 5],
+    [6, 5, 4, 3],
+    [2, 5, 1, 1],
+    [1, 4, 6, 5],
   ];
 
   /// Soft intro: tonic bass + held chord, percussion enters gradually.
@@ -787,6 +804,67 @@ class ArrangementEngine {
       velocity: 0.2,
     ),);
 
+    return notes;
+  }
+
+  /// Bridge/interlude: contrasting chord + sparse bass, creates a "breathing" moment.
+  static List<MidiNoteEvent> _generateInterlude(int tonicMidi, _StyleProfile profile, double duration, double startTime, List<int> progression) {
+    final notes = <MidiNoteEvent>[];
+    final scale = profile.scale;
+
+    // Use the 4th degree as a subdominant resting point
+    final subdominantDegree = 4;
+    final rootOffset = scale[(subdominantDegree - 1) % scale.length];
+    final rootMidi = tonicMidi + rootOffset;
+
+    // Held subdominant chord (soft)
+    final chordMidi = [rootMidi, rootMidi + 4, rootMidi + 7];
+    for (final midi in chordMidi) {
+      notes.add(MidiNoteEvent(
+        noteNumber: midi,
+        startSeconds: startTime,
+        durationSeconds: duration * 0.85,
+        velocity: 0.12,
+      ));
+    }
+
+    // Bass: pedal on the 4th degree
+    notes.add(MidiNoteEvent(
+      noteNumber: rootMidi - 12,
+      startSeconds: startTime,
+      durationSeconds: duration * 0.7,
+      velocity: 0.2,
+    ));
+
+    // Rising approach note near the end (lead back into next section)
+    final approachTime = startTime + duration * 0.7;
+    final dominantDegree = 5;
+    final dominantOffset = scale[(dominantDegree - 1) % scale.length];
+    notes.add(MidiNoteEvent(
+      noteNumber: tonicMidi + dominantOffset - 12,
+      startSeconds: approachTime,
+      durationSeconds: duration * 0.25,
+      velocity: 0.3,
+    ));
+
+    return notes;
+  }
+
+  /// Light percussion during interlude: hihat only, building anticipation.
+  static List<MidiNoteEvent> _generateInterludePercussion(double duration, double startTime, double tempo) {
+    final notes = <MidiNoteEvent>[];
+    final beatDuration = 60.0 / tempo;
+    final eighthDuration = beatDuration * 0.5;
+    var t = startTime;
+    while (t < startTime + duration) {
+      notes.add(MidiNoteEvent(
+        noteNumber: _hihat,
+        startSeconds: t,
+        durationSeconds: 0.03,
+        velocity: 0.15 + (t - startTime) / duration * 0.15, // crescendo
+      ));
+      t += eighthDuration;
+    }
     return notes;
   }
 
