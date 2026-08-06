@@ -53,5 +53,5 @@ class AppConfig {
   static const int highEndDeviceRamMB = 2048;
 
   /// 当前 APK 的 SHA-256（编译时嵌入，作为 Release 缺失 hash 时的回退校验值）
-  static const String apkSha256 = 'd0138beb92cb123319958e70bdf9e6d4faca84382070f5323701b3dacbc9e2a1';
+  static const String apkSha256 = '61fef1bde03d70304515335fa2db92ef0e2d572332f8aa6cdec247c97d624d70';
 }
