@@ -80,6 +80,16 @@ class EconomyProvider extends ChangeNotifier {
       'tit' => 'pet_blue_tit',
       'frog' => 'pet_rainbow_frog',
       'ladybug' => 'pet_ladybug',
+      'dog' => 'pet_dog',
+      'cat' => 'pet_cat',
+      'duck' => 'pet_duck',
+      'goat' => 'pet_goat',
+      'elf' => 'pet_elf',
+      'elephant' => 'pet_elephant',
+      'fox' => 'pet_fox',
+      'hedgehog' => 'pet_hedgehog',
+      'squirrel' => 'pet_squirrel',
+      'rabbit' => 'pet_rabbit',
       _ => null,
     };
     if (shopId == null) return false;

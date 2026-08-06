@@ -95,7 +95,11 @@ class EconomyRepository {
     final db = await _db.database;
     final rows = await db.query('shop_items');
     if (rows.isEmpty) return ShopItem.builtInItems;
-    return rows.map((r) => ShopItem.fromJson(r)).toList();
+    final dbItems = rows.map((r) => ShopItem.fromJson(r)).toList();
+    // 合并内置商品：确保新增的内置商品始终可用
+    final dbIds = dbItems.map((i) => i.id).toSet();
+    final missingBuiltIn = ShopItem.builtInItems.where((b) => !dbIds.contains(b.id)).toList();
+    return [...dbItems, ...missingBuiltIn];
   }
 
   // ═══════════════════════════════════════════════════════════
