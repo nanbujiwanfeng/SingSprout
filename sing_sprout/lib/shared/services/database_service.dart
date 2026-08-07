@@ -12,7 +12,7 @@ class DatabaseService {
   DatabaseService._();
 
   static const _dbName = 'singsprout.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _db;
   Future<Database>? _dbFuture;
@@ -256,6 +256,15 @@ class DatabaseService {
     if (oldVersion < 5) {
       await db.execute(
         'ALTER TABLE works ADD COLUMN review TEXT',
+      );
+    }
+    if (oldVersion < 6) {
+      // 修正七星瓢虫的等级解锁限制（已取消等级要求）
+      await db.update(
+        'shop_items',
+        {'unlock_tree_level': 0},
+        where: 'id = ?',
+        whereArgs: ['pet_ladybug'],
       );
     }
   }
